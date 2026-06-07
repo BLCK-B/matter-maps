@@ -37,7 +37,7 @@ export function getInitialStyle(): StyleSpecification {
             'horizon-color': '#ffffff',
             'horizon-fog-blend': 0.5,
             'fog-color': '#dfe9f5',
-            'fog-ground-blend': 0.5,
+            'fog-ground-blend': 1,
         },
     }
 }

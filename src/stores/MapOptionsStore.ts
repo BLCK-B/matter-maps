@@ -9,8 +9,6 @@ import {
 } from '@/actions/Actions'
 import config from 'config'
 
-const thunderforestApiKey = config.keys.thunderforest
-
 const osmAttribution =
     '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
 
@@ -37,12 +35,6 @@ export interface RasterStyle extends StyleOption {
     tilePixelRatio?: number
 }
 
-const mediaQuery =
-    '(-webkit-min-device-pixel-ratio: 1.5),(min--moz-device-pixel-ratio: 1.5),(-o-min-device-pixel-ratio: 3/2),(min-resolution: 1.5dppx)'
-const isRetina = window.devicePixelRatio > 1 || (window.matchMedia && window.matchMedia(mediaQuery).matches)
-const tilePixelRatio = isRetina ? 2 : 1
-const retina2x = isRetina ? '@2x' : ''
-
 const osmOrg: RasterStyle = {
     name: 'OpenStreetMap',
     type: 'raster',
@@ -53,10 +45,12 @@ const osmOrg: RasterStyle = {
 const osmCycl: RasterStyle = {
     name: 'Cyclosm',
     type: 'raster',
+    // The {a,b,c}.tile-cyclosm.openstreetmap.fr hosts are unreachable; the maintained CyclOSM endpoint is served
+    // (with CORS, which MapLibre requires) from dev.{a,b,c}.tile.openstreetmap.fr.
     url: [
-        'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-        'https://b.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-        'https://c.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+        'https://dev.a.tile.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+        'https://dev.b.tile.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+        'https://dev.c.tile.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
     ],
     attribution:
         osmAttribution +
@@ -72,54 +66,21 @@ const esriSatellite: RasterStyle = {
         ' i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
     maxZoom: 18,
 }
-const tfTransport: RasterStyle = {
-    name: 'TF Transport',
+const openTopo: RasterStyle = {
+    name: 'OpenTopoMap',
     type: 'raster',
     url: [
-        'https://a.tile.thunderforest.com/transport/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-        'https://b.tile.thunderforest.com/transport/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-        'https://c.tile.thunderforest.com/transport/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
+        'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+        'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+        'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
     ],
     attribution:
         osmAttribution +
-        ', <a href="https://www.thunderforest.com/maps/transport/" target="_blank">Thunderforest Transport</a>',
-    tilePixelRatio: tilePixelRatio,
-}
-const tfCycle: RasterStyle = {
-    name: 'TF Cycle',
-    type: 'raster',
-    url: [
-        'https://a.tile.thunderforest.com/cycle/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-        'https://b.tile.thunderforest.com/cycle/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-        'https://c.tile.thunderforest.com/cycle/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-    ],
-    attribution:
-        osmAttribution +
-        ', <a href="https://www.thunderforest.com/maps/opencyclemap/" target="_blank">Thunderforest Cycle</a>',
-    tilePixelRatio: tilePixelRatio,
-}
-const tfOutdoors: RasterStyle = {
-    name: 'TF Outdoors',
-    type: 'raster',
-    url: [
-        'https://a.tile.thunderforest.com/outdoors/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-        'https://b.tile.thunderforest.com/outdoors/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-        'https://c.tile.thunderforest.com/outdoors/{z}/{x}/{y}' + retina2x + '.png?apikey=' + thunderforestApiKey,
-    ],
-    attribution:
-        osmAttribution +
-        ', <a href="https://www.thunderforest.com/maps/outdoors/" target="_blank">Thunderforest Outdoors</a>',
-    tilePixelRatio: tilePixelRatio,
+        ', &copy; <a href="https://opentopomap.org" target="_blank">OpenTopoMap</a> (CC-BY-SA)',
+    maxZoom: 17,
 }
 
-const styleOptions: StyleOption[] = [
-    osmOrg,
-    osmCycl,
-    esriSatellite,
-    tfTransport,
-    tfCycle,
-    tfOutdoors,
-]
+const styleOptions: StyleOption[] = [osmOrg, esriSatellite, openTopo, osmCycl]
 
 export default class MapOptionsStore extends Store<MapOptionsStoreState> {
     constructor() {
