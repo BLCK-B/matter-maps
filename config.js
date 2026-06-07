@@ -11,10 +11,7 @@ const config = {
     // various api keys used for the GH backend and the different tile providers
     keys: {
         graphhopper: 'efc33bcc-a9e6-450b-9221-c52c5bf57de3',
-        maptiler: 'missing_api_key',
-        omniscale: 'missing_api_key',
         thunderforest: 'missing_api_key',
-        kurviger: 'missing_api_key',
         tracestrack: 'missing_api_key',
     },
     // if true there will be an option to enable the GraphHopper routing graph and the urban density visualization in the layers menu
