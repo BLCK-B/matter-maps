@@ -36,8 +36,6 @@ import POIsStore from '@/stores/POIsStore'
 import CurrentLocationStore from '@/stores/CurrentLocationStore'
 import { setDistanceFormat } from '@/Converters'
 import { AddressParseResult } from '@/pois/AddressParseResult'
-import { Pixel } from 'ol/pixel'
-import { toLonLat } from 'ol/proj'
 import { ErrorAction, InfoReceived, LocationUpdateSync } from '@/actions/Actions'
 
 console.log(`Source code: https://github.com/graphhopper/graphhopper-maps/tree/${GIT_SHA}`)
@@ -65,8 +63,9 @@ const routeStore = new RouteStore()
 const speechSynthesizer = new SpeechSynthesizerImpl(navigator.language)
 
 class CoordSysImpl implements MapCoordinateSystem {
-    getCoordinateFromPixel(pixel: Pixel) {
-        return toLonLat(getMap().getCoordinateFromPixel(pixel))
+    getCoordinateFromPixel(pixel: [number, number]) {
+        const lngLat = getMap().unproject(pixel)
+        return [lngLat.lng, lngLat.lat]
     }
 }
 const turnNavigationStore = new TurnNavigationStore(

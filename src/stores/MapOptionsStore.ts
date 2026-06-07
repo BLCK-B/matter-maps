@@ -72,18 +72,6 @@ const esriSatellite: RasterStyle = {
         ' i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
     maxZoom: 18,
 }
-const terrainSource: RasterStyle = {
-    name: 'terrainSource',
-    type: 'raster',
-    url: ['https://tiles.mapterhorn.com/tilejson.json'],
-    attribution: '',
-}
-const hillshadeSource: RasterStyle = {
-    name: 'hillshadeSource',
-    type: 'raster',
-    url: ['https://tiles.mapterhorn.com/tilejson.json'],
-    attribution: '',
-}
 const tfTransport: RasterStyle = {
     name: 'TF Transport',
     type: 'raster',

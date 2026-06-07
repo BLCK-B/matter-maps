@@ -8,7 +8,7 @@ import { SelectPOI, SetPoint, SetPOIs } from '@/actions/Actions'
 import PlainButton from '@/PlainButton'
 import { MarkerComponent } from '@/map/Marker'
 import QueryStore, { QueryPoint, QueryPointType } from '@/stores/QueryStore'
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 
 function POITable(props: { poi: POI }) {
     return (

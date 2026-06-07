@@ -1,74 +1,44 @@
-import { Feature, Map } from 'ol'
 import { useEffect } from 'react'
+import { Map } from 'maplibre-gl'
 import { RasterStyle, StyleOption } from '@/stores/MapOptionsStore'
-import TileLayer from 'ol/layer/Tile'
-import ImageTile from 'ol/ImageTile'
-import { XYZ } from 'ol/source'
-import { apply } from 'ol-mapbox-style'
-import MapLibreLayer from '@/layers/MapLibreLayer'
+import { runWhenStyleReady, safeRemoveLayer, safeRemoveSource } from '@/map/mapUtils'
+import { HILLSHADE_LAYER } from '@/map/mapStyle'
+
+const BASEMAP_SOURCE = 'gh-basemap'
+const BASEMAP_LAYER = 'gh-basemap'
 
 export default function useBackgroundLayer(map: Map, styleOption: StyleOption) {
     useEffect(() => {
-        removeCurrentBackgroundLayers(map)
-        addNewBackgroundLayers(map, styleOption)
+        const cancel = runWhenStyleReady(map, () => addBackground(map, styleOption))
         return () => {
-            removeCurrentBackgroundLayers(map)
+            cancel()
+            removeBackground(map)
         }
     }, [map, styleOption])
-
-    // Pointer cursor over interactive features — registered once, independent of style changes
-    useEffect(() => {
-        const onPointerMove = (evt: any) => {
-            if (evt.dragging) return // skip expensive hit-test while panning
-            const features = map.getFeaturesAtPixel(evt.pixel)
-            const atFeature = features.some(f => f instanceof Feature)
-            map.getTargetElement().style.cursor = atFeature ? 'pointer' : 'default'
-        }
-        map.on('pointermove', onPointerMove)
-        return () => {
-            map.un('pointermove', onPointerMove)
-        }
-    }, [map])
 }
 
-export function getCurrentBackgroundLayers(map: Map) {
-    return map
-        .getLayers()
-        .getArray()
-        .filter(l => {
-            // vector layers added via olms#addLayers have the mapbox-source key
-            return l.get('mapbox-source') || l.get('background-maplibre-layer') || l.get('background-raster-layer')
-        })
+function removeBackground(map: Map) {
+    safeRemoveLayer(map, BASEMAP_LAYER)
+    safeRemoveSource(map, BASEMAP_SOURCE)
 }
 
-function removeCurrentBackgroundLayers(map: Map) {
-    getCurrentBackgroundLayers(map).forEach(l => map.removeLayer(l))
-}
-
-function addNewBackgroundLayers(map: Map, styleOption: StyleOption) {
+function addBackground(map: Map, styleOption: StyleOption) {
+    removeBackground(map)
     if (styleOption.type === 'vector') {
-        // todo: handle promise return value?
-        // apply(map, styleOption.url)
-
-        const vectorLayer = new MapLibreLayer(styleOption.url as string)
-        vectorLayer.set('background-maplibre-layer', true)
-        map.addLayer(vectorLayer)
-    } else {
-        const rasterStyle = styleOption as RasterStyle
-        const tileLayer = new TileLayer({
-            source: new XYZ({
-                urls: rasterStyle.url,
-                maxZoom: rasterStyle.maxZoom,
-                attributions: [rasterStyle.attribution],
-                tilePixelRatio: rasterStyle.tilePixelRatio,
-                tileLoadFunction: (tile, src) => {
-                    const img = (tile as ImageTile).getImage() as HTMLImageElement
-                    img.referrerPolicy = 'strict-origin-when-cross-origin'
-                    img.src = src
-                },
-            }),
-        })
-        tileLayer.set('background-raster-layer', true)
-        map.addLayer(tileLayer)
+        // Vector basemaps (full style.json) are not yet supported by the 3D MapLibre renderer because swapping the
+        // whole style would wipe our overlays. The current style options are all raster, so this is a no-op for now.
+        console.warn('Vector basemap styles are not yet supported with the MapLibre 3D renderer:', styleOption.name)
+        return
     }
+    const rasterStyle = styleOption as RasterStyle
+    map.addSource(BASEMAP_SOURCE, {
+        type: 'raster',
+        tiles: rasterStyle.url,
+        tileSize: 256,
+        maxzoom: rasterStyle.maxZoom ?? 19,
+        attribution: rasterStyle.attribution,
+    })
+    // insert the basemap below the (persistent) hillshade layer so terrain shading is drawn on top of the tiles
+    const beforeId = map.getLayer(HILLSHADE_LAYER) ? HILLSHADE_LAYER : undefined
+    map.addLayer({ id: BASEMAP_LAYER, type: 'raster', source: BASEMAP_SOURCE }, beforeId)
 }

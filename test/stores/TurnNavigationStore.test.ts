@@ -21,7 +21,7 @@ import {
 } from '@/api/graphhopper'
 import Api, { ApiImpl } from '@/api/Api'
 import { setTranslation } from '@/translation/Translation'
-import { Pixel } from 'ol/pixel'
+import { Pixel } from '@/stores/TurnNavigationStore'
 import SettingsStore from '@/stores/SettingsStore'
 import { POIQuery } from '@/pois/AddressParseResult'
 import { Coordinate } from '@/utils'

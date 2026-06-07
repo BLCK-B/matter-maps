@@ -1,17 +1,15 @@
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 import { useEffect } from 'react'
 import { PathDetailsStoreState } from '@/stores/PathDetailsStore'
 import { FeatureCollection } from 'geojson'
-import VectorLayer from 'ol/layer/Vector'
-import VectorSource from 'ol/source/Vector'
-import { Stroke, Style } from 'ol/style'
-import { GeoJSON } from 'ol/format'
-import { fromLonLat } from 'ol/proj'
 import { Coordinate } from '@/utils'
 import { ChartPathDetail } from '@/pathDetails/elevationWidget/types'
+import { runWhenStyleReady, safeRemoveLayer, safeRemoveSource } from '@/map/mapUtils'
 
-const highlightedPathSegmentLayerKey = 'highlightedPathSegmentLayer'
-const activeDetailLayerKey = 'activeDetailLayer'
+const HIGHLIGHTED_SOURCE = 'gh-path-detail-highlight'
+const HIGHLIGHTED_LAYER = 'gh-path-detail-highlight'
+const ACTIVE_SOURCE = 'gh-path-detail-active'
+const ACTIVE_LAYER = 'gh-path-detail-active'
 
 /**
  * This layer highlights path segments that are above the elevation threshold set by the horizontal line in the
@@ -20,118 +18,74 @@ const activeDetailLayerKey = 'activeDetailLayer'
 export default function usePathDetailsLayer(map: Map, pathDetails: PathDetailsStoreState, showPaths: boolean = true) {
     // Highlighted segments (elevation threshold)
     useEffect(() => {
-        removeLayer(map, highlightedPathSegmentLayerKey)
-        addPathSegmentsLayer(map, pathDetails)
+        const cancel = runWhenStyleReady(map, () => addHighlightedSegments(map, pathDetails))
         return () => {
-            removeLayer(map, highlightedPathSegmentLayerKey)
+            cancel()
+            safeRemoveLayer(map, HIGHLIGHTED_LAYER)
+            safeRemoveSource(map, HIGHLIGHTED_SOURCE)
         }
     }, [map, pathDetails])
 
     // Active detail colored segments
     useEffect(() => {
-        removeLayer(map, activeDetailLayerKey)
-        if (pathDetails.activeDetail && showPaths) {
-            addActiveDetailLayer(map, pathDetails.activeDetail)
-        }
+        const cancel = runWhenStyleReady(map, () => {
+            if (pathDetails.activeDetail && showPaths) addActiveDetailLayer(map, pathDetails.activeDetail)
+        })
         return () => {
-            removeLayer(map, activeDetailLayerKey)
+            cancel()
+            safeRemoveLayer(map, ACTIVE_LAYER)
+            safeRemoveSource(map, ACTIVE_SOURCE)
         }
     }, [map, pathDetails.activeDetail, showPaths])
-
-    return
 }
 
-function removeLayer(map: Map, key: string) {
-    map.getLayers()
-        .getArray()
-        .filter(l => l.get(key))
-        .forEach(l => map.removeLayer(l))
-}
-
-function addPathSegmentsLayer(map: Map, pathDetails: PathDetailsStoreState) {
-    const style = new Style({
-        stroke: new Stroke({
-            color: 'red',
-            width: 4,
-            lineCap: 'round',
-            lineJoin: 'round',
-        }),
-    })
-    const highlightedPathSegmentsLayer = new VectorLayer({
-        source: new VectorSource({
-            features: new GeoJSON().readFeatures(
-                createHighlightedPathSegments(pathDetails.pathDetailsHighlightedSegments),
-            ),
-        }),
-        style: () => style,
-    })
-    highlightedPathSegmentsLayer.set(highlightedPathSegmentLayerKey, true)
-    highlightedPathSegmentsLayer.setZIndex(3)
-    map.addLayer(highlightedPathSegmentsLayer)
-}
-
-function addActiveDetailLayer(map: Map, detail: ChartPathDetail) {
-    // Sort segments so shorter ones are drawn last (on top).
-    // This ensures small distinctive segments (e.g. steps, cobblestone)
-    // aren't overshadowed by adjacent longer segments with round line caps.
-    const sorted = [...detail.segments].sort((a, b) => b.coordinates.length - a.coordinates.length)
-
-    const features: any[] = sorted.map(seg => ({
-        type: 'Feature',
-        geometry: {
-            type: 'LineString',
-            coordinates: seg.coordinates.map(c => fromLonLat(c)),
-        },
-        properties: {
-            color: seg.color,
-        },
-    }))
-
-    const featureCollection: FeatureCollection = {
-        type: 'FeatureCollection',
-        features,
-    }
-
-    const styleCache: Record<string, Style> = {}
-    const layer = new VectorLayer({
-        source: new VectorSource({
-            features: new GeoJSON().readFeatures(featureCollection),
-        }),
-        style: feature => {
-            const color = feature.get('color') || '#666'
-            let style = styleCache[color]
-            if (!style) {
-                style = new Style({
-                    stroke: new Stroke({
-                        color,
-                        width: 6,
-                        lineCap: 'butt',
-                        lineJoin: 'round',
-                    }),
-                })
-                styleCache[color] = style
-            }
-            return style
-        },
-    })
-    layer.set(activeDetailLayerKey, true)
-    layer.setZIndex(2)
-    map.addLayer(layer)
-}
-
-function createHighlightedPathSegments(segments: Coordinate[][]) {
-    const featureCollection: FeatureCollection = {
+function addHighlightedSegments(map: Map, pathDetails: PathDetailsStoreState) {
+    safeRemoveLayer(map, HIGHLIGHTED_LAYER)
+    safeRemoveSource(map, HIGHLIGHTED_SOURCE)
+    const segments: Coordinate[][] = pathDetails.pathDetailsHighlightedSegments
+    const data: FeatureCollection = {
         type: 'FeatureCollection',
         features: [
             {
                 type: 'Feature',
+                properties: {},
                 geometry: {
                     type: 'MultiLineString',
-                    coordinates: segments.map(s => s.map(c => fromLonLat([c.lng, c.lat]))),
+                    coordinates: segments.map(s => s.map(c => [c.lng, c.lat])),
                 },
-                properties: {},
             },
         ],
     }
-    return featureCollection
+    map.addSource(HIGHLIGHTED_SOURCE, { type: 'geojson', data })
+    map.addLayer({
+        id: HIGHLIGHTED_LAYER,
+        type: 'line',
+        source: HIGHLIGHTED_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': 'red', 'line-width': 4 },
+    })
+}
+
+function addActiveDetailLayer(map: Map, detail: ChartPathDetail) {
+    safeRemoveLayer(map, ACTIVE_LAYER)
+    safeRemoveSource(map, ACTIVE_SOURCE)
+    // Sort segments so shorter ones are drawn last (on top). This ensures small distinctive segments
+    // (e.g. steps, cobblestone) aren't overshadowed by adjacent longer segments with round line caps.
+    const sorted = [...detail.segments].sort((a, b) => b.coordinates.length - a.coordinates.length)
+    const data: FeatureCollection = {
+        type: 'FeatureCollection',
+        features: sorted.map(seg => ({
+            type: 'Feature',
+            properties: { color: seg.color || '#666' },
+            geometry: { type: 'LineString', coordinates: seg.coordinates as number[][] },
+        })),
+    }
+    map.addSource(ACTIVE_SOURCE, { type: 'geojson', data })
+    map.addLayer({
+        id: ACTIVE_LAYER,
+        type: 'line',
+        source: ACTIVE_SOURCE,
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
+    })
 }

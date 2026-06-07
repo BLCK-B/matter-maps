@@ -1,11 +1,6 @@
-import { Feature, Map } from 'ol'
+import maplibregl, { Map, Marker } from 'maplibre-gl'
 import { useEffect } from 'react'
-import { Point } from 'ol/geom'
-import { fromLonLat } from 'ol/proj'
-import VectorLayer from 'ol/layer/Vector'
-import VectorSource from 'ol/source/Vector'
-import { Icon, Style } from 'ol/style'
-import { POI, POIsStoreState } from '@/stores/POIsStore'
+import { POIsStoreState } from '@/stores/POIsStore'
 
 import charger from '../pois/img/charger.svg'
 import cinematic_blur from '../pois/img/cinematic_blur.svg'
@@ -38,7 +33,6 @@ import wifi from '../pois/img/wifi.svg'
 import water_drop from '../pois/img/water_drop.svg'
 
 import { createPOIMarker } from '@/layers/createMarkerSVG'
-import { Select } from 'ol/interaction'
 import Dispatcher from '@/stores/Dispatcher'
 import { SelectPOI } from '@/actions/Actions'
 
@@ -76,87 +70,36 @@ const svgObjects: { [id: string]: any } = {
     wifi: wifi(),
 }
 
-// -300 -1260 1560 1560
-// <path d="m -46.278793,-739.50038 c -0.119546,-249.77515 165.728493,-515.03832 526.428923,-516.08842 392.86041,-1.1438 528.51077,269.46826 528.84707,519.24315 0.3488,259.06981 -254.78805,473.49828 -382.7069,701.499743 C 519.97666,154.64661 509.30678,296.87227 479.27479,296.44795 444.1137,295.95116 422.98296,153.89016 311.80839,-41.049369 182.8093,-267.24338 -46.156365,-483.7031 -46.278793,-739.50038 Z" style="stroke-width:2.3555" />
 for (const k in svgObjects) {
     const svgObj = svgObjects[k]
     svgStrings[k] = createPOIMarker(svgObj.props.children.props.d)
-    // console.log(svgStrings[k])
 }
 
 export default function usePOIsLayer(map: Map, poisState: POIsStoreState) {
     useEffect(() => {
-        removePOIs(map)
-        let select: Select | null = null
-        if (addPOIsLayer(map, poisState.pois)) select = addPOISelection(map)
+        const markers: Marker[] = []
+        poisState.pois.forEach(poi => {
+            const el = document.createElement('div')
+            el.style.cursor = 'pointer'
+            el.innerHTML = svgStrings[poi.icon] ?? svgStrings['store']
+            const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+                .setLngLat([poi.coordinate.lng, poi.coordinate.lat])
+                .addTo(map)
+            el.addEventListener('click', e => {
+                e.stopPropagation()
+                el.style.transform += ' scale(1.4)'
+                Dispatcher.dispatch(new SelectPOI(poi))
+            })
+            markers.push(marker)
+        })
+
+        // clicking on the empty map (not on a POI marker) clears the selection
+        const onMapClick = () => Dispatcher.dispatch(new SelectPOI(null))
+        if (poisState.pois.length > 0) map.on('click', onMapClick)
+
         return () => {
-            removePOIs(map)
-            if (select) map.removeInteraction(select)
+            markers.forEach(m => m.remove())
+            map.off('click', onMapClick)
         }
     }, [map, poisState.pois])
-}
-
-function removePOIs(map: Map) {
-    map.getLayers()
-        .getArray()
-        .filter(l => l.get('gh:pois'))
-        .forEach(l => map.removeLayer(l))
-}
-
-function addPOISelection(map: Map) {
-    const select = new Select()
-    map.addInteraction(select)
-    select.on('select', event => {
-        const selectedFeatures = event.selected
-        if (selectedFeatures.length > 0) {
-            const feature = selectedFeatures[0]
-            const props = feature.get('gh:marker_props')
-            feature.setStyle(
-                new Style({
-                    zIndex: 2,
-                    image: new Icon({
-                        scale: [1.4, 1.4],
-                        src: 'data:image/svg+xml;utf8,' + svgStrings[props.icon],
-                        displacement: [0, 18],
-                    }),
-                }),
-            )
-            Dispatcher.dispatch(new SelectPOI(props.poi))
-        } else Dispatcher.dispatch(new SelectPOI(null))
-    })
-    return select
-}
-
-function addPOIsLayer(map: Map, pois: POI[]) {
-    if (pois.length == 0) return false
-
-    const features = pois.map((poi, i) => {
-        const feature = new Feature({
-            geometry: new Point(fromLonLat([poi.coordinate.lng, poi.coordinate.lat])),
-        })
-        feature.set('gh:marker_props', { icon: poi.icon, poi: poi })
-        return feature
-    })
-    const poisLayer = new VectorLayer({
-        source: new VectorSource({
-            features: features,
-        }),
-    })
-    poisLayer.set('gh:pois', true)
-    const cachedStyles: { [id: string]: Style } = {}
-    poisLayer.setStyle(feature => {
-        const props = feature.get('gh:marker_props')
-        let style = cachedStyles[props.icon]
-        if (style) return style
-        style = new Style({
-            image: new Icon({
-                src: 'data:image/svg+xml;utf8,' + svgStrings[props.icon],
-                displacement: [0, 18],
-            }),
-        })
-        cachedStyles[props.icon] = style
-        return style
-    })
-    map.addLayer(poisLayer)
-    return true
 }

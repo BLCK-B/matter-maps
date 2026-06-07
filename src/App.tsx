@@ -15,7 +15,6 @@ import {
     getCurrentLocationStore,
 } from '@/stores/Stores'
 import MapComponent from '@/map/MapComponent'
-import mapStyles from '@/map/Map.module.css'
 import MapOptions from '@/map/MapOptions'
 import MobileSidebar from '@/sidebar/MobileSidebar'
 import { useMediaQuery } from 'react-responsive'
@@ -36,7 +35,7 @@ import useQueryPointsLayer from '@/layers/UseQueryPointsLayer'
 import usePathsLayer from '@/layers/UsePathsLayer'
 import ContextMenu from '@/layers/ContextMenu'
 import usePathDetailsLayer from '@/layers/UsePathDetailsLayer'
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 import { getMap } from '@/map/map'
 import CustomModelBox from '@/sidebar/CustomModelBox'
 import useRoutingGraphLayer from '@/layers/UseRoutingGraphLayer'
@@ -275,7 +274,7 @@ function LargeScreenLayout({
     }, [hasRoute, routeRequestPending])
     // Hide map attribution when elevation widget is expanded (it would be covered)
     useEffect(() => {
-        const el = map.getTargetElement()?.querySelector('.' + mapStyles.customAttribution) as HTMLElement | null
+        const el = map.getContainer().querySelector('.maplibregl-ctrl-attrib') as HTMLElement | null
         if (el) el.style.display = elevationState === 'expanded' ? 'none' : ''
     }, [elevationState, map])
     return (

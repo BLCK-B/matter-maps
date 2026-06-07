@@ -31,7 +31,6 @@ import {
 import {Instruction, Path, RoutingArgs} from '@/api/graphhopper'
 import {tr} from '@/translation/Translation'
 import {SpeechSynthesizer} from '@/SpeechSynthesizer'
-import {Pixel} from 'ol/pixel'
 import SettingsStore from '@/stores/SettingsStore'
 import {meterToFt, meterToMiles} from '@/Converters'
 import {Coordinate} from '@/utils'
@@ -86,6 +85,8 @@ export interface TNSettingsState {
     forceVectorTiles: boolean
     fullScreen: boolean
 }
+
+export type Pixel = [number, number]
 
 export interface MapCoordinateSystem {
     getCoordinateFromPixel(pixel: Pixel): number[]
@@ -500,7 +501,7 @@ export default class TurnNavigationStore extends Store<TurnNavigationStoreState>
 
         let mouseControlled = false // control GPS movement via mouse or see below: along a predefined route
         if (mouseControlled) {
-            const pixel = [] as number[]
+            const pixel = [0, 0] as Pixel
             let prevCoord = { lng: 0, lat: 0 } as Coordinate
             let prevTime = Date.now()
             addEventListener('mousemove', event => {

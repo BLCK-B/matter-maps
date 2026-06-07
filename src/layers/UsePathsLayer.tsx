@@ -1,24 +1,26 @@
-import { Feature, Map } from 'ol'
-import { Path } from '@/api/graphhopper'
 import { useEffect } from 'react'
-import VectorLayer from 'ol/layer/Vector'
-import VectorSource from 'ol/source/Vector'
-import { Stroke, Style } from 'ol/style'
-import { fromLonLat } from 'ol/proj'
-import { Select } from 'ol/interaction'
-import { click } from 'ol/events/condition'
+import { Map, MapLayerMouseEvent } from 'maplibre-gl'
+import { Path } from '@/api/graphhopper'
 import Dispatcher from '@/stores/Dispatcher'
 import { SetSelectedPath } from '@/actions/Actions'
-import { SelectEvent } from 'ol/interaction/Select'
 import { TurnNavigationStoreState } from '@/stores/TurnNavigationStore'
-import { RouteStoreState } from '@/stores/RouteStore'
-import { Geometry, LineString } from 'ol/geom'
 import { QueryPoint } from '@/stores/QueryStore'
-import { distance } from 'ol/coordinate'
+import { runWhenStyleReady, safeRemoveLayer, safeRemoveSource } from '@/map/mapUtils'
+import { FeatureCollection } from 'geojson'
 
-const pathsLayerKey = 'pathsLayer'
-const selectedPathLayerKey = 'selectedPathLayer'
-const accessNetworkLayerKey = 'accessNetworkLayer'
+const PATHS_SOURCE = 'gh-paths'
+const PATHS_CASING = 'gh-paths-casing'
+const PATHS_LINE = 'gh-paths-line'
+const SELECTED_SOURCE = 'gh-selected-path'
+const SELECTED_CASING = 'gh-selected-path-casing'
+const SELECTED_LINE = 'gh-selected-path-line'
+const ACCESS_SOURCE = 'gh-access-network'
+const ACCESS_LINE = 'gh-access-network'
+
+// handlers we register on the (re-created) unselected paths layer and need to remove again
+let onClick: ((e: MapLayerMouseEvent) => void) | null = null
+let onEnter: (() => void) | null = null
+let onLeave: (() => void) | null = null
 
 export default function usePathsLayer(
     map: Map,
@@ -29,164 +31,162 @@ export default function usePathsLayer(
     showPaths: boolean = true,
 ) {
     useEffect(() => {
-        removeCurrentPathLayers(map)
-        if (turnNavigation.showUI && turnNavigation.activePath) {
-            addSelectedPathsLayer(map, turnNavigation.activePath, true)
-        } else {
-            if (showPaths) {
-                addUnselectedPathsLayer(map, paths.filter(p => p != selectedPath))
-                addSelectedPathsLayer(map, selectedPath, false)
-                addAccessNetworkLayer(map, selectedPath, queryPoints)
+        const cancel = runWhenStyleReady(map, () => {
+            removeAll(map)
+            if (turnNavigation.showUI && turnNavigation.activePath) {
+                addSelectedPath(map, turnNavigation.activePath)
+            } else if (showPaths) {
+                addUnselectedPaths(
+                    map,
+                    paths.filter(p => p != selectedPath),
+                )
+                addSelectedPath(map, selectedPath)
+                addAccessNetwork(map, selectedPath, queryPoints)
             }
-        }
+        })
         return () => {
-            removeCurrentPathLayers(map)
+            cancel()
+            removeAll(map)
         }
     }, [map, paths, selectedPath, turnNavigation.showUI, turnNavigation.activePath, showPaths, queryPoints])
 }
 
-function removeCurrentPathLayers(map: Map) {
-    map.getLayers()
-        .getArray()
-        .filter(l => l.get(pathsLayerKey) || l.get(selectedPathLayerKey) || l.get(accessNetworkLayerKey))
-        .forEach(l => map.removeLayer(l))
+function removeAll(map: Map) {
+    if (onClick) {
+        map.off('click', PATHS_LINE, onClick)
+        map.off('click', PATHS_CASING, onClick)
+        onClick = null
+    }
+    if (onEnter) {
+        map.off('mouseenter', PATHS_LINE, onEnter)
+        map.off('mouseenter', PATHS_CASING, onEnter)
+        onEnter = null
+    }
+    if (onLeave) {
+        map.off('mouseleave', PATHS_LINE, onLeave)
+        map.off('mouseleave', PATHS_CASING, onLeave)
+        onLeave = null
+    }
+    safeRemoveLayer(map, PATHS_CASING, PATHS_LINE, SELECTED_CASING, SELECTED_LINE, ACCESS_LINE)
+    safeRemoveSource(map, PATHS_SOURCE)
+    safeRemoveSource(map, SELECTED_SOURCE)
+    safeRemoveSource(map, ACCESS_SOURCE)
 }
 
-function addUnselectedPathsLayer(map: Map, paths: Path[]) {
-    const styleArray = [
-        new Style({
-            stroke: new Stroke({
-                color: 'rgba(39,93,173,0.8)',
-                width: 6,
-            }),
-        }),
-        new Style({
-            stroke: new Stroke({
-                color: 'rgba(201,217,241,0.7)',
-                width: 4,
-            }),
-        }),
-    ]
-    const layer = new VectorLayer({
-        source: new VectorSource({
-            features: paths.map((path: Path, index) => {
-                const f = new Feature({
-                    index: index,
-                })
-                if (path.points?.coordinates)
-                    f.setGeometry(new LineString(path.points.coordinates.map(c => fromLonLat(c))))
-                return f
-            }),
-        }),
-        style: styleArray,
-        opacity: 0.7,
-        zIndex: 1,
-    })
-    layer.set(pathsLayerKey, true)
-    map.addLayer(layer)
+function lineString(coordinates: number[][]) {
+    return { type: 'LineString' as const, coordinates }
+}
 
-    // select an alternative path if clicked
-    removeSelectPathInteractions(map)
-    const select = new Select({
-        condition: click,
-        layers: [layer],
-        style: null,
-        hitTolerance: 5,
+function addUnselectedPaths(map: Map, paths: Path[]) {
+    const data: FeatureCollection = {
+        type: 'FeatureCollection',
+        features: paths
+            .filter(p => p.points?.coordinates)
+            .map((path, index) => ({
+                type: 'Feature' as const,
+                properties: { index },
+                geometry: lineString(path.points.coordinates as number[][]),
+            })),
+    }
+    map.addSource(PATHS_SOURCE, { type: 'geojson', data })
+    map.addLayer({
+        id: PATHS_CASING,
+        type: 'line',
+        source: PATHS_SOURCE,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': 'rgba(39,93,173,0.8)', 'line-width': 6, 'line-opacity': 0.7 },
     })
-    select.on('select', (e: SelectEvent) => {
-        const index = e.selected[0].getProperties().index
+    map.addLayer({
+        id: PATHS_LINE,
+        type: 'line',
+        source: PATHS_SOURCE,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': 'rgba(201,217,241,0.7)', 'line-width': 4, 'line-opacity': 0.7 },
+    })
+
+    // select an alternative path when clicked
+    onClick = (e: MapLayerMouseEvent) => {
+        const feature = e.features?.[0]
+        if (!feature) return
+        const index = feature.properties?.index as number
         Dispatcher.dispatch(new SetSelectedPath(paths[index]))
-    })
-    select.set('gh:select_path_interaction', true)
-    map.addInteraction(select)
+    }
+    map.on('click', PATHS_LINE, onClick)
+    map.on('click', PATHS_CASING, onClick)
+    onEnter = () => (map.getCanvas().style.cursor = 'pointer')
+    onLeave = () => (map.getCanvas().style.cursor = '')
+    map.on('mouseenter', PATHS_LINE, onEnter)
+    map.on('mouseenter', PATHS_CASING, onEnter)
+    map.on('mouseleave', PATHS_LINE, onLeave)
+    map.on('mouseleave', PATHS_CASING, onLeave)
 }
 
-function createBezierLineString(start: number[], end: number[]): LineString {
-    const bezierPoints = []
+function addSelectedPath(map: Map, selectedPath: Path) {
+    const coordinates = (selectedPath.points?.coordinates as number[][]) ?? []
+    const data: FeatureCollection = {
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', properties: {}, geometry: lineString(coordinates) }],
+    }
+    map.addSource(SELECTED_SOURCE, { type: 'geojson', data })
+    map.addLayer({
+        id: SELECTED_CASING,
+        type: 'line',
+        source: SELECTED_SOURCE,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': 'rgba(255,255,255,0.9)', 'line-width': 10, 'line-opacity': 0.8 },
+    })
+    map.addLayer({
+        id: SELECTED_LINE,
+        type: 'line',
+        source: SELECTED_SOURCE,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': 'rgba(39,100,200,0.85)', 'line-width': 8, 'line-opacity': 0.8 },
+    })
+}
+
+function createBezierLineString(start: number[], end: number[]): number[][] {
+    const bezierPoints: number[][] = []
     const center = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
-    const radius = distance(start, end) / 2
+    const radius = Math.hypot(end[0] - start[0], end[1] - start[1]) / 2
 
     const startAngle = Math.atan2(start[1] - center[1], start[0] - center[0])
     const endAngle = Math.atan2(end[1] - center[1], end[0] - center[0])
 
-    // Define the control points for the Bezier curve
     const controlPoints = [
         center[0] + (1 / 2) * radius * Math.sin(startAngle + (1 / 2) * (endAngle - startAngle)),
         center[1] + (1 / 2) * radius * Math.cos(startAngle + (1 / 2) * (endAngle - startAngle)),
     ]
 
-    // Calculate intermediate points along the curve using a Bezier curve
     bezierPoints.push(start)
     for (let t = 0; t <= 1; t += 0.1) {
-        const point = [
+        bezierPoints.push([
             (1 - t) * (1 - t) * start[0] + 2 * t * (1 - t) * controlPoints[0] + t * t * end[0],
             (1 - t) * (1 - t) * start[1] + 2 * t * (1 - t) * controlPoints[1] + t * t * end[1],
-        ]
-        bezierPoints.push(point)
+        ])
     }
     bezierPoints.push(end)
-    return new LineString(bezierPoints)
+    return bezierPoints
 }
 
-function addAccessNetworkLayer(map: Map, selectedPath: Path, queryPoints: QueryPoint[]) {
-    const style = new Style({
-        stroke: new Stroke({
-            color: 'rgba(143,183,241,0.9)',
-            width: 5,
-            lineDash: [1, 10],
-            lineCap: 'round',
-            lineJoin: 'round',
-        }),
-    })
-    const layer = new VectorLayer({
-        source: new VectorSource(),
-    })
-    layer.setStyle(style)
-    for (let i = 0; i < selectedPath.snapped_waypoints.coordinates.length; i++) {
+function addAccessNetwork(map: Map, selectedPath: Path, queryPoints: QueryPoint[]) {
+    const features: FeatureCollection['features'] = []
+    const snapped = selectedPath.snapped_waypoints?.coordinates ?? []
+    for (let i = 0; i < snapped.length; i++) {
         if (i >= queryPoints.length) break // can happen if deleted too fast
-        const start = fromLonLat([queryPoints[i].coordinate.lng, queryPoints[i].coordinate.lat])
-        const end = fromLonLat(selectedPath.snapped_waypoints.coordinates[i])
-        layer.getSource()?.addFeature(new Feature(createBezierLineString(start, end)))
+        const start = [queryPoints[i].coordinate.lng, queryPoints[i].coordinate.lat]
+        const end = snapped[i] as number[]
+        features.push({
+            type: 'Feature',
+            properties: {},
+            geometry: lineString(createBezierLineString(start, end)),
+        })
     }
-    layer.set(accessNetworkLayerKey, true)
-    layer.setZIndex(1)
-    map.addLayer(layer)
-}
-
-function addSelectedPathsLayer(map: Map, selectedPath: Path, updateMoreFrequently: boolean) {
-    const styleArray = [
-        new Style({
-            stroke: new Stroke({
-                color: 'rgba(255,255,255,0.9)',
-                width: 10,
-            }),
-        }),
-        new Style({
-            stroke: new Stroke({
-                color: 'rgba(39,100,200,0.85)',
-                width: 8,
-            }),
-        }),
-    ]
-
-    const layer = new VectorLayer({
-        source: new VectorSource({
-            features: [new Feature(new LineString(selectedPath.points.coordinates.map(c => fromLonLat(c))))],
-        }),
-        style: styleArray,
-        updateWhileAnimating: updateMoreFrequently,
-        updateWhileInteracting: updateMoreFrequently,
-        opacity: 0.8,
-        zIndex: 2,
+    map.addSource(ACCESS_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features } })
+    map.addLayer({
+        id: ACCESS_LINE,
+        type: 'line',
+        source: ACCESS_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': 'rgba(143,183,241,0.9)', 'line-width': 5, 'line-dasharray': [0.2, 2] },
     })
-
-    layer.set(selectedPathLayerKey, true)
-    map.addLayer(layer)
-}
-
-function removeSelectPathInteractions(map: Map) {
-    map.getInteractions()
-        .getArray()
-        .filter(i => i.get('gh:select_path_interaction'))
-        .forEach(i => map.removeInteraction(i))
 }

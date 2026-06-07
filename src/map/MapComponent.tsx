@@ -1,7 +1,7 @@
-import 'ol/ol.css'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import styles from '@/map/Map.module.css'
 import { useEffect, useRef } from 'react'
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 import { Bbox } from '@/api/graphhopper'
 import Dispatcher from '@/stores/Dispatcher'
 import { ErrorAction } from '@/actions/Actions'
@@ -12,11 +12,18 @@ type MapComponentProps = {
     map: Map
 }
 
-/** A small react component that simply attaches our map instance to a div to show the map **/
+/** A small react component that attaches our (single) MapLibre map instance to a div to show the map **/
 export default function ({ map }: MapComponentProps) {
     const mapElement = useRef<HTMLDivElement | null>(null)
     useEffect(() => {
-        map.setTarget(mapElement.current!)
+        const container = map.getContainer()
+        // Move the map's container into this layout slot. On layout switches (small/large screen) this simply
+        // re-parents the same canvas instead of recreating the map.
+        mapElement.current!.appendChild(container)
+        map.resize()
+        return () => {
+            if (container.parentElement === mapElement.current) mapElement.current?.removeChild(container)
+        }
     }, [map])
     return <div ref={mapElement} className={styles.mapContainer} />
 }

@@ -3,7 +3,7 @@ import styles from '@/layers/DefaultMapPopup.module.css'
 import { PathDetailsStoreState } from '@/stores/PathDetailsStore'
 import { metersToText } from '@/Converters'
 import MapPopup from '@/layers/MapPopup'
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 import { SettingsContext } from '@/contexts/SettingsContext'
 
 interface PathDetailPopupProps {

@@ -1,8 +1,7 @@
-import { Map, Overlay } from 'ol'
+import { Map, MapMouseEvent } from 'maplibre-gl'
 import { ContextMenuContent } from '@/map/ContextMenuContent'
 import { useEffect, useRef, useState } from 'react'
 import { QueryPoint } from '@/stores/QueryStore'
-import { fromLonLat, toLonLat } from 'ol/proj'
 import styles from '@/layers/ContextMenu.module.css'
 import { RouteStoreState } from '@/stores/RouteStore'
 import { Coordinate } from '@/utils'
@@ -13,66 +12,80 @@ interface ContextMenuProps {
     queryPoints: QueryPoint[]
 }
 
-const overlay = new Overlay({
-    autoPan: true,
-})
-
 export default function ContextMenu({ map, route, queryPoints }: ContextMenuProps) {
     const [menuCoordinate, setMenuCoordinate] = useState<Coordinate | null>(null)
     const container = useRef<HTMLDivElement | null>(null)
 
-    const openContextMenu = (e: any) => {
-        e.preventDefault()
-        const coordinate = map.getEventCoordinate(e)
-        const lonLat = toLonLat(coordinate)
-        setMenuCoordinate({ lng: lonLat[0], lat: lonLat[1] })
-    }
-
-    const closeContextMenu = () => {
-        setMenuCoordinate(null)
-    }
+    const closeContextMenu = () => setMenuCoordinate(null)
 
     useEffect(() => {
-        overlay.setElement(container.current!)
-        map.addOverlay(overlay)
+        const el = container.current!
+        el.style.position = 'absolute'
+        el.style.top = '0'
+        el.style.left = '0'
+        el.style.zIndex = '3'
+        map.getContainer().appendChild(el)
 
-        const longTouchHandler = new LongTouchHandler(e => openContextMenu(e))
-        const handleTouchStart = (e: any) => longTouchHandler.onTouchStart(e)
-        const handleTouchMove = () => longTouchHandler.onTouchEnd()
-        const handleTouchEnd = () => longTouchHandler.onTouchEnd()
-        function onMapTargetChange() {
-            // it is important to set up new listeners whenever the map target changes, like when we switch between the
-            // small and large screen layout, see #203
+        const openAt = (lng: number, lat: number) => setMenuCoordinate({ lng, lat })
 
-            // we cannot listen to right-click simply using map.on('contextmenu') and need to add the listener to
-            // the map container instead
-            // https://github.com/openlayers/openlayers/issues/12512#issuecomment-879403189
-            map.getTargetElement().addEventListener('contextmenu', openContextMenu)
-
-            map.getTargetElement().addEventListener('touchstart', handleTouchStart)
-            map.getTargetElement().addEventListener('touchmove', handleTouchMove)
-            map.getTargetElement().addEventListener('touchend', handleTouchEnd)
-
-            map.getTargetElement().addEventListener('click', closeContextMenu)
+        // right-click (desktop) — MapLibre fires 'contextmenu' on the map directly
+        const onContextMenu = (e: MapMouseEvent) => {
+            e.preventDefault()
+            openAt(e.lngLat.lng, e.lngLat.lat)
         }
-        map.on('change:target', onMapTargetChange)
+        map.on('contextmenu', onContextMenu)
+
+        // long touch (mobile), see #229
+        const canvas = map.getCanvasContainer()
+        const longTouchHandler = new LongTouchHandler((x, y) => {
+            const lngLat = map.unproject([x, y])
+            openAt(lngLat.lng, lngLat.lat)
+        })
+        const handleTouchStart = (e: TouchEvent) => {
+            if (e.touches.length !== 1) return longTouchHandler.cancel()
+            const rect = canvas.getBoundingClientRect()
+            longTouchHandler.onTouchStart(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        }
+        const handleTouchEnd = () => longTouchHandler.cancel()
+        canvas.addEventListener('touchstart', handleTouchStart)
+        canvas.addEventListener('touchmove', handleTouchEnd)
+        canvas.addEventListener('touchend', handleTouchEnd)
+
+        // close on a plain click or when the map starts moving
+        map.on('click', closeContextMenu)
+        map.on('movestart', closeContextMenu)
 
         return () => {
-            map.getTargetElement().removeEventListener('contextmenu', openContextMenu)
-
-            map.getTargetElement().removeEventListener('touchstart', handleTouchStart)
-            map.getTargetElement().removeEventListener('touchmove', handleTouchMove)
-            map.getTargetElement().removeEventListener('touchend', handleTouchEnd)
-
-            map.getTargetElement().removeEventListener('click', closeContextMenu)
-            map.removeOverlay(overlay)
-            map.un('change:target', onMapTargetChange)
+            map.off('contextmenu', onContextMenu)
+            canvas.removeEventListener('touchstart', handleTouchStart)
+            canvas.removeEventListener('touchmove', handleTouchEnd)
+            canvas.removeEventListener('touchend', handleTouchEnd)
+            map.off('click', closeContextMenu)
+            map.off('movestart', closeContextMenu)
+            if (el.parentElement) el.parentElement.removeChild(el)
         }
     }, [map])
 
+    // keep the menu positioned at its geographic coordinate while the camera moves
     useEffect(() => {
-        overlay.setPosition(menuCoordinate ? fromLonLat([menuCoordinate.lng, menuCoordinate.lat]) : undefined)
-    }, [menuCoordinate])
+        const el = container.current!
+        const update = () => {
+            if (!menuCoordinate) {
+                el.style.display = 'none'
+                return
+            }
+            el.style.display = ''
+            const p = map.project([menuCoordinate.lng, menuCoordinate.lat])
+            el.style.transform = `translate(${p.x}px, ${p.y}px)`
+        }
+        update()
+        map.on('move', update)
+        map.on('render', update)
+        return () => {
+            map.off('move', update)
+            map.off('render', update)
+        }
+    }, [map, menuCoordinate])
 
     return (
         <div className={styles.contextMenu} ref={container}>
@@ -90,25 +103,22 @@ export default function ContextMenu({ map, route, queryPoints }: ContextMenuProp
 
 // See #229
 class LongTouchHandler {
-    private readonly callback: (e: any) => void
+    private readonly callback: (x: number, y: number) => void
     private currentTimeout: number = 0
-    private currentEvent?: any
+    private x = 0
+    private y = 0
 
-    constructor(onLongTouch: (e: any) => void) {
+    constructor(onLongTouch: (x: number, y: number) => void) {
         this.callback = onLongTouch
     }
 
-    onTouchStart(e: any) {
-        this.currentEvent = e
-        this.currentTimeout = window.setTimeout(() => {
-            console.log('long touch')
-            if (this.currentEvent) this.callback(this.currentEvent)
-        }, 500)
+    onTouchStart(x: number, y: number) {
+        this.x = x
+        this.y = y
+        this.currentTimeout = window.setTimeout(() => this.callback(this.x, this.y), 500)
     }
 
-    onTouchEnd() {
-        // console.log('touch end')
+    cancel() {
         window.clearTimeout(this.currentTimeout)
-        this.currentEvent = undefined
     }
 }

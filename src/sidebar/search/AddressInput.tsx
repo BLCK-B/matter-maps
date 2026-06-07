@@ -19,8 +19,7 @@ import { useMediaQuery } from 'react-responsive'
 import PopUp from '@/sidebar/search/PopUp'
 import PlainButton from '@/PlainButton'
 import { onCurrentLocationSelected } from '@/map/MapComponent'
-import { toLonLat, transformExtent } from 'ol/proj'
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 import { AddressParseResult } from '@/pois/AddressParseResult'
 import { getMap } from '@/map/map'
 import { calcDist, Coordinate, getBBoxFromCoord } from '@/utils'
@@ -187,8 +186,8 @@ export default function AddressInput(props: AddressInputProps) {
     const type = props.point.type
 
     // get the bias point for the geocoder
-    const lonlat = toLonLat(getMap().getView().getCenter()!)
-    const biasCoord = { lng: lonlat[0], lat: lonlat[1] }
+    const center = getMap().getCenter()
+    const biasCoord = { lng: center.lng, lat: center.lat }
 
     // do not focus on mobile as we would hide the map with the "input"-view
     const focusFirstInput = props.index == 0 && !isSmallScreen
@@ -239,7 +238,7 @@ export default function AddressInput(props: AddressInputProps) {
                                 if (query.length < 2) {
                                     setAutocompleteItems(buildRecentItems(query, 5, excludeCoord))
                                 }
-                                geocoder.request(query, biasCoord, getMap().getView().getZoom())
+                                geocoder.request(query, biasCoord, getMap().getZoom() + 1)
                             }
                         }
                         props.onChange(query)
@@ -345,8 +344,8 @@ function buildRecentItems(filter?: string, limit?: number, excludeCoord?: Coordi
 function handlePoiSearch(poiSearch: ReverseGeocoder, result: AddressParseResult, map: Map) {
     if (!result.hasPOIs()) return
 
-    const origExtent = map.getView().calculateExtent(map.getSize())
-    const extent = transformExtent(origExtent, 'EPSG:3857', 'EPSG:4326')
+    const b = map.getBounds()
+    const extent = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
     poiSearch.request(result, extent as Bbox)
 }
 

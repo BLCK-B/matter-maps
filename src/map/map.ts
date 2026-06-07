@@ -1,51 +1,40 @@
 import Dispatcher from '@/stores/Dispatcher'
-import { Map, View } from 'ol'
-import { fromLonLat } from 'ol/proj'
+import maplibregl, { Map } from 'maplibre-gl'
 import { MapIsLoaded, StopSyncCurrentLocation } from '@/actions/Actions'
-import { defaults as defaultControls } from 'ol/control'
-import { defaults as defaultInteractions, MouseWheelZoom } from 'ol/interaction'
-import styles from '@/map/Map.module.css'
+import { getInitialStyle } from '@/map/mapStyle'
 
 let map: Map | undefined
 
 export function createMap(): Map {
-    map = new Map({
-        view: new View({
-            enableRotation: true,
-            constrainRotation: false,
-            multiWorld: false,
-            constrainResolution: true,
-            center: fromLonLat([10, 10]),
-            zoom: 2,
-        }),
-        interactions: defaultInteractions({
-            pinchRotate: false,
-            mouseWheelZoom: false,
-        }).extend([
-            new MouseWheelZoom({
-                constrainResolution: true,
-                timeout: 200,
-            }),
-        ]),
-        controls: defaultControls({
-            rotate: false, // for now also disable this extra button
-            zoom: true,
-            zoomOptions: {
-                className: styles.customZoom,
-            },
-            attribution: true,
-            attributionOptions: {
-                className: styles.customAttribution,
-                collapsible: false,
-            },
-        }),
-    })
-    map.once('postrender', () => {
-        Dispatcher.dispatch(new MapIsLoaded())
+    // The container is created detached and later attached to the layout by MapComponent. This way the single map
+    // instance can be moved between the small/large screen layouts without being destroyed.
+    const container = document.createElement('div')
+    container.style.width = '100%'
+    container.style.height = '100%'
+
+    map = new maplibregl.Map({
+        container,
+        style: getInitialStyle(),
+        center: [10, 10],
+        // MapLibre uses one zoom level less than OpenLayers did (the old MapLibreLayer bridge used `zoom - 1`).
+        zoom: 1,
+        pitch: 0,
+        maxPitch: 85,
+        // we provide our own attribution control so we can place it like before
+        attributionControl: false,
+        // keep the map north-up by default but allow the user to rotate/tilt into 3D (right-drag, ctrl-drag, two finger)
+        dragRotate: true,
+        pitchWithRotate: true,
     })
 
-    map.on('pointerdrag', () => {
-        if (!getMap().getView().getAnimating()) Dispatcher.dispatch(new StopSyncCurrentLocation())
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showZoom: true, showCompass: true }))
+    map.addControl(new maplibregl.AttributionControl({ compact: false }))
+
+    map.on('load', () => Dispatcher.dispatch(new MapIsLoaded()))
+
+    // when the user drags the map we stop following the current location (previously the OL 'pointerdrag' event)
+    map.on('dragstart', e => {
+        if ((e as any).originalEvent) Dispatcher.dispatch(new StopSyncCurrentLocation())
     })
 
     return map

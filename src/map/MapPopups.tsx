@@ -1,4 +1,4 @@
-import { Map } from 'ol'
+import { Map } from 'maplibre-gl'
 import PathDetailPopup from '@/layers/PathDetailPopup'
 import MapFeaturePopup from '@/layers/MapFeaturePopup'
 import InstructionPopup from '@/layers/InstructionPopup'
