@@ -3,6 +3,7 @@ import { Action } from '@/stores/Dispatcher'
 import {
     MapIsLoaded,
     SelectMapLayer,
+    Toggle3DBuildings,
     ToggleExternalMVTLayer,
     ToggleRoutingGraph,
     ToggleUrbanDensityLayer,
@@ -19,6 +20,7 @@ export interface MapOptionsStoreState {
     routingGraphEnabled: boolean
     urbanDensityEnabled: boolean
     externalMVTEnabled: boolean
+    threeDBuildingsEnabled: boolean
 }
 
 export interface StyleOption {
@@ -101,6 +103,7 @@ export default class MapOptionsStore extends Store<MapOptionsStoreState> {
             routingGraphEnabled: false,
             urbanDensityEnabled: false,
             externalMVTEnabled: false,
+            threeDBuildingsEnabled: false,
             isMapLoaded: false,
         }
     }
@@ -130,6 +133,12 @@ export default class MapOptionsStore extends Store<MapOptionsStoreState> {
             return {
                 ...state,
                 externalMVTEnabled: action.externalMVTLayerEnabled,
+            }
+        } else if (action instanceof Toggle3DBuildings) {
+            if (state.threeDBuildingsEnabled === action.enabled) return state
+            return {
+                ...state,
+                threeDBuildingsEnabled: action.enabled,
             }
         } else if (action instanceof MapIsLoaded) {
             return {

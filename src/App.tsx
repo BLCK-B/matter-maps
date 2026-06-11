@@ -36,6 +36,7 @@ import useQueryPointsLayer from '@/layers/UseQueryPointsLayer'
 import usePathsLayer from '@/layers/UsePathsLayer'
 import ContextMenu from '@/layers/ContextMenu'
 import usePathDetailsLayer from '@/layers/UsePathDetailsLayer'
+import use3DBuildingsLayer from '@/layers/Use3DBuildingsLayer'
 import { Map } from 'maplibre-gl'
 import { getMap } from '@/map/map'
 import CustomModelBox from '@/sidebar/CustomModelBox'
@@ -128,6 +129,7 @@ export default function App() {
     // our different map layers
     useBackgroundLayer(map, mapOptions.selectedStyle)
     useExternalMVTLayer(map, mapOptions.externalMVTEnabled)
+    use3DBuildingsLayer(map, mapOptions.threeDBuildingsEnabled)
     useMapBorderLayer(map, info.bbox)
     useAreasLayer(map, settings.drawAreasEnabled, query.customModelStr, query.customModelEnabled)
     useRoutingGraphLayer(map, mapOptions.routingGraphEnabled)

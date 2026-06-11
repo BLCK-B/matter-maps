@@ -2,7 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import styles from './MapOptions.module.css'
 import { MapOptionsStoreState } from '@/stores/MapOptionsStore'
 import Dispatcher from '@/stores/Dispatcher'
-import { SelectMapLayer, ToggleExternalMVTLayer, ToggleRoutingGraph, ToggleUrbanDensityLayer } from '@/actions/Actions'
+import {
+    SelectMapLayer,
+    Toggle3DBuildings,
+    ToggleExternalMVTLayer,
+    ToggleRoutingGraph,
+    ToggleUrbanDensityLayer,
+} from '@/actions/Actions'
 import PlainButton from '@/PlainButton'
 import LayerImg from './layer-group-solid.svg'
 import * as config from 'config'
@@ -69,6 +75,19 @@ const Options = function ({ storeState, notifyChanged }: OptionsProps) {
                         </label>
                     </div>
                 ))}
+            </div>
+            <div className={styles.option}>
+                <input
+                    type="checkbox"
+                    id="buildings-3d-checkbox"
+                    checked={storeState.threeDBuildingsEnabled}
+                    disabled={!storeState.isMapLoaded}
+                    onChange={e => {
+                        notifyChanged()
+                        Dispatcher.dispatch(new Toggle3DBuildings(e.target.checked))
+                    }}
+                />
+                <label htmlFor="buildings-3d-checkbox">Show 3D buildings</label>
             </div>
             {config.routingGraphLayerAllowed && (
                 <>

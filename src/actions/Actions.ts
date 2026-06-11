@@ -235,6 +235,14 @@ export class ToggleExternalMVTLayer implements Action {
     }
 }
 
+export class Toggle3DBuildings implements Action {
+    readonly enabled: boolean
+
+    constructor(enabled: boolean) {
+        this.enabled = enabled
+    }
+}
+
 export class MapIsLoaded implements Action {}
 
 export class MoveMapToPoint implements Action {
