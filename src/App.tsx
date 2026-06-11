@@ -27,6 +27,7 @@ import { RouteStoreState } from '@/stores/RouteStore'
 import { MapOptionsStoreState } from '@/stores/MapOptionsStore'
 import { ErrorStoreState } from '@/stores/ErrorStore'
 import { CurrentLocationStoreState } from '@/stores/CurrentLocationStore'
+import { PathDetailsStoreState } from '@/stores/PathDetailsStore'
 import Search from '@/sidebar/search/Search'
 import ErrorMessage from '@/sidebar/ErrorMessage'
 import { TurnNavigationStoreState } from './stores/TurnNavigationStore'
@@ -180,6 +181,7 @@ export default function App() {
                         encodedValues={info.encoded_values}
                         drawAreas={settings.drawAreasEnabled}
                         currentLocation={currentLocation}
+                        pathDetails={pathDetails}
                         pathDisplayMode={pathDisplayMode}
                         onCyclePathDisplay={() =>
                             setPathDisplayMode(m =>
@@ -198,6 +200,7 @@ export default function App() {
                         encodedValues={info.encoded_values}
                         drawAreas={settings.drawAreasEnabled}
                         currentLocation={currentLocation}
+                        pathDetails={pathDetails}
                         pathDisplayMode={pathDisplayMode}
                         onCyclePathDisplay={() =>
                             setPathDisplayMode(m =>
@@ -247,6 +250,7 @@ interface LayoutProps {
     encodedValues: object[]
     drawAreas: boolean
     turnNavigation: TurnNavigationStoreState
+    pathDetails: PathDetailsStoreState
     pathDisplayMode: 'normal' | 'incline' | 'hidden'
     onCyclePathDisplay: () => void
 }
@@ -261,6 +265,7 @@ function LargeScreenLayout({
     drawAreas,
     turnNavigation,
     currentLocation,
+    pathDetails,
     pathDisplayMode,
     onCyclePathDisplay,
 }: LayoutProps) {
@@ -389,6 +394,7 @@ function LargeScreenLayout({
                     onToggleExpanded={() => setElevationState(s => (s === 'expanded' ? 'compact' : 'expanded'))}
                     onClose={() => setElevationState('closed')}
                     inclineOnMap={inclineOnMap}
+                    hoverDistance={pathDetails.pathDetailsPoint ? pathDetails.pathDetailsPoint.distance : null}
                 />
             </div>
         </>

@@ -104,6 +104,14 @@ export default class ChartRenderer {
         if (totalDist === 0) return null
 
         const distance = (x / plotWidth) * totalDist
+        return this.resultForDistance(distance)
+    }
+
+    // Builds a hover result for a given distance along the route. Used both by hitTest (pointer over the
+    // chart) and by external hovers coming from the map (hovering the route on the map highlights the graph).
+    resultForDistance(distance: number): ChartHoverResult | null {
+        if (!this.data || this.data.elevation.length === 0) return null
+        const elev = this.data.elevation
 
         // Binary search for closest point
         let lo = 0

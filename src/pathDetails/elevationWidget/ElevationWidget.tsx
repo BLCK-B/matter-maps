@@ -27,6 +27,8 @@ interface ElevationWidgetProps {
     onClose?: () => void
     alternativeRouteNumbers: number[]
     elevationLabel: string
+    // distance (m from start) of an external hover coming from the map; draws the hover line on the chart
+    externalHoverDistance: number | null
 }
 
 const CHART_HEIGHT = 120
@@ -42,12 +44,15 @@ export default function ElevationWidget({
     onClose,
     alternativeRouteNumbers,
     elevationLabel,
+    externalHoverDistance,
 }: ElevationWidgetProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const chartCanvasRef = useRef<HTMLCanvasElement>(null)
     const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
     const rendererRef = useRef<ChartRenderer | null>(null)
     const observerRef = useRef<ResizeObserver | null>(null)
+    // while the pointer is on the chart it owns the hover line directly; ignore the external (map) hover then
+    const pointerOnChart = useRef(false)
     const [selectedKey, setSelectedKey] = useState<string | null>(persistedSelectedKey)
     const [alternativeIndex, setAltIndex] = useState(-1) // -1 = hidden, 0..N-1 = show that alternative
 
@@ -112,9 +117,24 @@ export default function ElevationWidget({
         rendererRef.current?.setVisibleAlternativeIndex(alternativeIndex)
     }, [alternativeIndex])
 
+    // Reflect an external hover (e.g. hovering the route on the map) by drawing the hover line on the chart.
+    // Idempotent with the chart's own pointer handlers, which dispatch the same distance back through the store.
+    useEffect(() => {
+        const renderer = rendererRef.current
+        if (!renderer || pointerOnChart.current) return
+        if (externalHoverDistance == null) {
+            renderer.clearHoverLine()
+            return
+        }
+        const result = renderer.resultForDistance(externalHoverDistance)
+        if (result) renderer.drawHoverLine(result)
+        else renderer.clearHoverLine()
+    }, [externalHoverDistance, data])
+
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<HTMLCanvasElement>) => {
             if (!rendererRef.current) return
+            pointerOnChart.current = true
             const rect = e.currentTarget.getBoundingClientRect()
             const x = e.clientX - rect.left
             const y = e.clientY - rect.top
@@ -131,6 +151,7 @@ export default function ElevationWidget({
     )
 
     const handleMouseLeave = useCallback(() => {
+        pointerOnChart.current = false
         rendererRef.current?.clearHoverLine()
         onHover(null)
     }, [onHover])
@@ -138,6 +159,7 @@ export default function ElevationWidget({
     const handleTouchMove = useCallback(
         (e: React.TouchEvent<HTMLCanvasElement>) => {
             if (!rendererRef.current) return
+            pointerOnChart.current = true
             e.preventDefault() // prevent scrolling while interacting with chart
             const touch = e.touches[0]
             const rect = e.currentTarget.getBoundingClientRect()
@@ -157,6 +179,7 @@ export default function ElevationWidget({
 
     const handleTouchEnd = useCallback(() => {
         // Keep the hover line visible after finger lifts — don't clear it
+        pointerOnChart.current = false
         onHover(null)
     }, [onHover])
 

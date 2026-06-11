@@ -16,6 +16,8 @@ interface ElevationInfoBarProps {
     onToggleExpanded: () => void
     onClose?: () => void
     inclineOnMap: boolean
+    // distance (m from start) of the current hover, sourced from the store so a map hover shows on the graph
+    hoverDistance?: number | null
 }
 
 export default function ElevationInfoBar({
@@ -26,6 +28,7 @@ export default function ElevationInfoBar({
     onToggleExpanded,
     onClose,
     inclineOnMap,
+    hoverDistance,
 }: ElevationInfoBarProps) {
     const settings = useContext(SettingsContext)
     const [selectedDropdownDetail, setSelectedDropdownDetail] = useState<ChartPathDetail | null>(null)
@@ -87,6 +90,7 @@ export default function ElevationInfoBar({
             onClose={onClose}
             alternativeRouteNumbers={alternativeRouteNumbers}
             elevationLabel={tr('elevation')}
+            externalHoverDistance={hoverDistance ?? null}
         />
     )
 }
