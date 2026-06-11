@@ -17,6 +17,8 @@ export interface PathDetailsPoint {
     point: Coordinate
     elevation: number
     description: string
+    // distance from the start of the route, in meters
+    distance: number
 }
 
 export interface PathDetailsStoreState {

@@ -132,10 +132,18 @@ export default function App() {
     useRoutingGraphLayer(map, mapOptions.routingGraphEnabled)
     useUrbanDensityLayer(map, mapOptions.urbanDensityEnabled)
     type PathDisplayMode = 'normal' | 'incline' | 'hidden'
-    const [pathDisplayMode, setPathDisplayMode] = useState<PathDisplayMode>('normal')
+    const [pathDisplayMode, setPathDisplayMode] = useState<PathDisplayMode>('incline')
     const showPaths = pathDisplayMode !== 'hidden'
     const inclineOnMap = pathDisplayMode === 'incline'
-    usePathsLayer(map, route.routingResult.paths, route.selectedPath, query.queryPoints, turnNavigation, showPaths)
+    usePathsLayer(
+        map,
+        route.routingResult.paths,
+        route.selectedPath,
+        query.queryPoints,
+        turnNavigation,
+        showPaths,
+        inclineOnMap,
+    )
     useQueryPointsLayer(map, query.queryPoints)
     usePathDetailsLayer(map, pathDetails, showPaths)
     useNavigationLocationLayer(map, turnNavigation)

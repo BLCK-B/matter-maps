@@ -24,12 +24,21 @@ export default function PathDetailPopup({ map, pathDetails }: PathDetailPopupPro
                 {pathDetails.pathDetailsPoint && (
                     <p>
                         {metersToText(
+                            Math.round(pathDetails.pathDetailsPoint.distance),
+                            settings.showDistanceInMiles,
+                        )}
+                        {' · '}
+                        {metersToText(
                             Math.round(pathDetails.pathDetailsPoint.elevation),
                             settings.showDistanceInMiles,
                             true,
                         )}
-                        <br />
-                        {pathDetails.pathDetailsPoint!.description}
+                        {pathDetails.pathDetailsPoint.description && (
+                            <>
+                                <br />
+                                {pathDetails.pathDetailsPoint.description}
+                            </>
+                        )}
                     </p>
                 )}
             </div>

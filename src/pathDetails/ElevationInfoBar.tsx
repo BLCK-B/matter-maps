@@ -63,6 +63,7 @@ export default function ElevationInfoBar({
                         point: result.point,
                         elevation: result.elevation,
                         description,
+                        distance: result.distance,
                     }),
                 )
             } else {

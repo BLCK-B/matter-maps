@@ -29,7 +29,10 @@ export default function usePathDetailsLayer(map: Map, pathDetails: PathDetailsSt
     // Active detail colored segments
     useEffect(() => {
         const cancel = runWhenStyleReady(map, () => {
-            if (pathDetails.activeDetail && showPaths) addActiveDetailLayer(map, pathDetails.activeDetail)
+            // incline ('_incline') is drawn directly onto the selected route by usePathsLayer, so the overlay
+            // only handles the other (dropdown-selected) path details here
+            if (pathDetails.activeDetail && showPaths && pathDetails.activeDetail.key !== '_incline')
+                addActiveDetailLayer(map, pathDetails.activeDetail)
         })
         return () => {
             cancel()
@@ -86,6 +89,8 @@ function addActiveDetailLayer(map: Map, detail: ChartPathDetail) {
         type: 'line',
         source: ACTIVE_SOURCE,
         layout: { 'line-cap': 'butt', 'line-join': 'round' },
-        paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
+        // slightly wider than the selected path's blue line (8) so the colors fully replace it, while the
+        // selected path's white casing (10) still shows as a thin border
+        paint: { 'line-color': ['get', 'color'], 'line-width': 9 },
     })
 }
