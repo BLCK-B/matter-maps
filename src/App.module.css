@@ -98,6 +98,22 @@
     box-shadow: 10px 10px 10px rgba(0, 0, 0, 0.1);
 }
 
+/* The MapLibre navigation control (zoom + compass) occupies the top-right corner of the map (~97px tall).
+   On large screens our map option buttons share that corner, so push them down below the control to avoid
+   overlap. Scoped to the large-screen layout (direct child of .appWrapper); on small screens the buttons sit
+   below the search bar and don't collide. Children in order: MapOptions, LocationButton, incline. */
+.appWrapper > .onMapRightSide > div:nth-child(1) {
+    top: 105px;
+}
+
+.appWrapper > .onMapRightSide > div:nth-child(2) {
+    top: 157px;
+}
+
+.appWrapper > .onMapRightSide > div:nth-child(3) {
+    top: 209px;
+}
+
 .inclineButton {
     position: absolute;
     right: 10px;
