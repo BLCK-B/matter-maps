@@ -1,9 +1,17 @@
 import Dispatcher from '@/stores/Dispatcher'
-import maplibregl, { Map } from 'maplibre-gl'
+import maplibregl, { Map, RequestParameters } from 'maplibre-gl'
 import { MapIsLoaded, StopSyncCurrentLocation } from '@/actions/Actions'
 import { getInitialStyle } from '@/map/mapStyle'
 
 let map: Map | undefined
+
+// Serve map/terrain tiles from the browser's HTTP cache whenever a copy already exists, only hitting the network
+// for tiles we haven't downloaded yet. This avoids re-fetching tiles when panning back over seen areas, which in
+// turn stops the 3D camera from bumping as DEM elevation re-arrives, and keeps the CPU/network idle when it can be.
+function cacheTiles(url: string, resourceType?: string): RequestParameters | undefined {
+    if (resourceType === 'Tile') return { url, cache: 'force-cache' }
+    return undefined
+}
 
 export function createMap(): Map {
     // The container is created detached and later attached to the layout by MapComponent. This way the single map
@@ -25,6 +33,11 @@ export function createMap(): Map {
         // keep the map north-up by default but allow the user to rotate/tilt into 3D (right-drag, ctrl-drag, two finger)
         dragRotate: true,
         pitchWithRotate: true,
+        // performance: reuse cached tiles instead of re-requesting them once they expire, and serve already
+        // downloaded tiles from the browser cache (see cacheTiles). Together this cuts redundant network/CPU work
+        // and the camera jitter that comes from terrain tiles reloading.
+        refreshExpiredTiles: false,
+        transformRequest: cacheTiles,
     })
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showZoom: true, showCompass: true }))

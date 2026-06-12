@@ -233,12 +233,22 @@ function addSelectedPath(map: Map, selectedPath: Path, inclineColors: boolean) {
                 }
             }
             const c = coordinates[bestIdx]
+            // incline of the segment at the hovered point (same rise/run % the incline coloring uses)
+            let incline: number | undefined = undefined
+            if (has3D) {
+                const j = bestIdx < coordinates.length - 1 ? bestIdx : bestIdx - 1
+                const a = coordinates[j]
+                const b = coordinates[j + 1]
+                const dist = planeDist(a, b)
+                if (dist > 0) incline = ((b[2] - a[2]) / dist) * 100
+            }
             Dispatcher.dispatch(
                 new PathDetailsHover({
                     point: { lng: c[0], lat: c[1] },
                     elevation: has3D ? c[2] : 0,
                     description: '',
                     distance: cumulative[bestIdx],
+                    incline,
                 }),
             )
         }

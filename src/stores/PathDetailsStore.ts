@@ -19,6 +19,8 @@ export interface PathDetailsPoint {
     description: string
     // distance from the start of the route, in meters
     distance: number
+    // incline at this point in percent (rise/run * 100); undefined when no elevation data is available
+    incline?: number
 }
 
 export interface PathDetailsStoreState {

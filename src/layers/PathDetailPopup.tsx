@@ -27,11 +27,18 @@ export default function PathDetailPopup({ map, pathDetails }: PathDetailPopupPro
                             Math.round(pathDetails.pathDetailsPoint.distance),
                             settings.showDistanceInMiles,
                         )}
-                        {' · '}
+                        <br />
                         {metersToText(
                             Math.round(pathDetails.pathDetailsPoint.elevation),
                             settings.showDistanceInMiles,
                             true,
+                        )}
+                        {pathDetails.pathDetailsPoint.incline !== undefined && (
+                            <>
+                                <br />
+                                {Math.round(pathDetails.pathDetailsPoint.incline)}
+                                {' %'}
+                            </>
                         )}
                         {pathDetails.pathDetailsPoint.description && (
                             <>
